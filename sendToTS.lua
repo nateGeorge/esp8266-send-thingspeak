@@ -23,26 +23,27 @@ _G[moduleName] = M
 
 local address = "184.106.153.149" -- IP for api.thingspeak.com
 
-local function loadKeys()
-    if file.open('keys') then
+local function loadKeys(fileName)
+    if file.open(fileName) then
         local line = file.readline()
-        readKey = string.sub(line,1,string.len(line)-1) -- hack to remove CR/LF
+        channelID = string.sub(line,1,string.len(line)-1) -- hack to remove CR/LF
+        line = file.readline()
+        readKey = string.sub(line,1,string.len(line)-1)
         line = file.readline()
         writeKey = string.sub(line,1,string.len(line)-1)
         file.close()
     end
 end
 
-function M.sendData(dataToSend, fields, debug, readkey, writekey)
+function M.sendData(fileName, dataToSend, fields, debug, callback)
     -- dataToSend is a table of data to send, 
     -- each entry is a table, with names of fields as first value in each entrytable
     -- the second value is the data
     -- if you want to specify exact fields, use fields = true,
     -- and make the third value in each dataToSend table the field number
+    -- callback is a file to run upon recieving a response from the server
     wifi.sta.connect()
-    loadKeys()
-    readkey = readkey or readKey
-    writekey = writekey or writeKey
+    loadKeys(fileName)
     debug = debug or false
     fields = fields or false
     tmr.alarm(1,1000,1,function()
@@ -60,15 +61,17 @@ function M.sendData(dataToSend, fields, debug, readkey, writekey)
                 if debug then
                     print(msg)
                 end
-                --local success = nil
-                --_,_,success = string.find(msg, "(success)")
-                --print(success)
-                --if (success==nil) then
-                --    print('unsucessful send')
-                --else
-                --    print("great success, very nice, I like")
-                --end
-                --print(node.heap())
+                local status
+                _, _, status = string.find(msg, "Status: (.+)\r\n")
+                print("status: "..status)
+                print(status=='200 OK') -- having a problem - next message is recieved before the code gets here
+                if (status=='200 OK') then
+                    print('successful send')
+                else
+                    print('unsuccessful send')
+                end
+                dofile(callback)
+                collectgarbage()
             end)
             sk:on("connection",function(conn)
                 if debug then
@@ -92,14 +95,17 @@ function M.sendData(dataToSend, fields, debug, readkey, writekey)
                             dataStr = dataStr.."&"
                         end
                         dataStr = dataStr.."field"..tostring(num).."="..arr[2];
+                        print(node.heap())
                     end
                 end
                 sendStr = sendStr.."Host: "..address.."\r\n"
-                .."Connection: close\r\n"
-                .."X-THINGSPEAKAPIKEY: "..writekey.."\r\n"
-                .."Content-Type: application/x-www-form-urlencoded\r\n"
-                .."Content-Length: "..string.len(dataStr).."\r\n\r\n"
-                ..dataStr.."\r\n"
+                sendStr = sendStr.."Connection: close\r\n"
+                sendStr = sendStr.."X-THINGSPEAKAPIKEY: "..writeKey.."\r\n"
+                sendStr = sendStr.."Content-Type: application/x-www-form-urlencoded\r\n"
+                sendStr = sendStr.."Content-Length: "..string.len(dataStr).."\r\n\r\n"
+                print(node.heap())
+                sendStr = sendStr..dataStr.."\r\n"
+                print(node.heap())
                 conn:send(sendStr)
                 if debug then
                     conn:on("sent",function() print("sent!") end)
