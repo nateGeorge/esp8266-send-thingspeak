@@ -38,8 +38,14 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
     tmr.alarm(1,1000,1,function()
         if debug then
             print("connecting")
+            print(node.heap())
         end
         if (wifi.sta.status()==5) then
+            tmr.stop(1)
+            -- timeout incase it can't connect for some reason
+            tmr.alarm(1, 5*60*1000, 0, function()
+                node.restart()
+            end)
             if debug then
                 print("connected")
             end
@@ -60,6 +66,7 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
                     print('unsuccessful send')
                 end
                 collectgarbage()
+                tmr.stop(1)
                 if callback~=nil then
                     print('running callback file')
                     dofile(callback)
@@ -105,7 +112,6 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
                 print(sendStr)
             end)
             sk:connect(80, address)
-            tmr.stop(1)
         end
     end)
 end
