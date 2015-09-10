@@ -35,9 +35,14 @@ function M.readData(fileName, debug, numResults, callback)
     tmr.alarm(1, 1000, 1, function()
         if debug then
             print("connecting")
+            print(node.heap())
         end
         if (wifi.sta.status()==5) then
             tmr.stop(1)
+            -- timeout incase it can't connect for some reason
+            tmr.alarm(1, 5*60*1000, 0, function()
+                node.restart()
+            end)
             if debug then
                 print("connected to wifi")
             end
@@ -57,12 +62,14 @@ function M.readData(fileName, debug, numResults, callback)
                     print(msg)
                 end
                 for i=1, 8, 1 do
-                    _, _, fields[i] = string.find(msg, "\"field"..tostring(i).."\":\"(%d%.?%d*)\",")
+                    _, _, fields[i] = string.find(msg, "\"field"..tostring(i).."\":\"(%d%.?%d*)\"")
                 end
                 for i=1, numResults, 1 do
-                    _, _, createdTimes[i] = string.find(msg, "\"created_at\":\"(.*)\",\"entry_id\":")
+                    _, _, createdTimes[i] = string.find(msg, "\"created_at\":\"(%d*%-%d*%-%d*T%d*:%d*:%d*Z)\",\"entry_id\"")
+                    print('createdTimes'..createdTimes[i])
                 end
                 collectgarbage()
+                tmr.stop(1)
                 if callback~=nil then
                     dofile(callback)
                 end
@@ -80,7 +87,7 @@ function M.readData(fileName, debug, numResults, callback)
                     sendStr = sendStr.."&results="..tostring(numResults)
                 end
                 print(node.heap())
-                sendStr = sendStr.."HTTP/1.1\r\n"
+                sendStr = sendStr.." HTTP/1.1\r\n"
                 print(node.heap())
                 sendStr = sendStr.."Host: "..address.."\r\n"
                 sendStr = sendStr.."Connection: close\r\n"
