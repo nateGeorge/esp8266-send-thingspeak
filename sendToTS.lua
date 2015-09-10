@@ -70,8 +70,11 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
                 else
                     print('unsuccessful send')
                 end
-                dofile(callback)
                 collectgarbage()
+                if callback~=nil then
+                    print('running callback file')
+                    dofile(callback)
+                end
             end)
             sk:on("connection",function(conn)
                 if debug then
