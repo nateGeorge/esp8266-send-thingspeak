@@ -1,6 +1,8 @@
 local moduleName = ...
 local M = {}
 _G[moduleName] = M
+fields = {}
+createdTimes = {}
 
 local address = "184.106.153.149" -- IP for api.thingspeak.com
 
@@ -16,24 +18,28 @@ local function loadKeys(fileName)
     end
 end
 
-function M.readData(fileName, debug, numResults)
+function M.readData(fileName, debug, numResults, callback)
     -- dataToSend is a table of data to send, 
     -- each entry is a table, with names of fields as first value in each entrytable
     -- the second value is the data
     -- if you want to specify exact fields, use fields = true,
     -- and make the third value in each dataToSend table the field number
-    -- fileName is name of file containing channelID and API keys
-    wifi.sta.connect()
+    -- fileName is name of file containing channelID and API keys and channel ID
+    -- callback is a file to run after getting the results
+    if wifi.sta.status()~=5 and wifi.sta.status()~=1 then
+        wifi.sta.connect()
+    end
     loadKeys(fileName)
     debug = debug or false
     numResults = numResults or 100
-        tmr.alarm(1, 1000, 1, function()
+    tmr.alarm(1, 1000, 1, function()
         if debug then
             print("connecting")
         end
         if (wifi.sta.status()==5) then
+            tmr.stop(1)
             if debug then
-                print("connected")
+                print("connected to wifi")
             end
             sk = net.createConnection(net.TCP, 0)
             sk:on("reconnection", function(conn) 
@@ -46,30 +52,31 @@ function M.readData(fileName, debug, numResults)
                 print("socket disconnected")
             end
             end)
-            sk:on("connection", function(conn)
-            if debug then
-                print("socket connected")
-            end
-            end)
             sk:on("receive", function(conn, msg)
                 if debug then
                     print(msg)
                 end
+                for i=1, 8, 1 do
+                    _, _, fields[i] = string.find(msg, "\"field"..tostring(i).."\":\"(%d%.?%d*)\",")
+                end
+                for i=1, numResults, 1 do
+                    _, _, createdTimes[i] = string.find(msg, "\"created_at\":\"(.*)\",\"entry_id\":")
+                end
                 collectgarbage()
+                if callback~=nil then
+                    dofile(callback)
+                end
             end)
             sk:on("connection", function(conn)
                 if debug then
                     print("socket connected")
                     print("getting data...")
                     print(node.heap())
-                    collectgarbage()
-                    print(node.heap())
                 end
                 sendStr = "GET /channels/"..channelID.."/feed.json?key="..readKey
                 print(node.heap())
-                print('numresults: '..numResults)
+                print('numresults: '..tostring(numResults))
                 if (numResults~=100) then
-                    print('num results set to '..numResults)
                     sendStr = sendStr.."&results="..tostring(numResults)
                 end
                 print(node.heap())
@@ -88,7 +95,6 @@ function M.readData(fileName, debug, numResults)
                 print(sendStr)
             end)
             sk:connect(80, address)
-            tmr.stop(1)
         end
     end)
 end
