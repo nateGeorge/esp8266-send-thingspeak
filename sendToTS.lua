@@ -28,20 +28,26 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
     -- dataToSend is a table of data to send, 
     -- each entry is a table, with names of fields as first value in each entrytable
     -- the second value is the data
-    -- if you want to specify exact fields, use fields = true,
+    -- e.g.
+    -- dataToSend = {}
+    -- dataToSend[1] = {'water level', 5}
+    --
+    -- If you want to specify exact fields, use fields = true,
     -- and make the third value in each dataToSend table the field number
+    --
     -- callback is a file to run upon recieving a response from the server
     wifi.sta.connect()
     loadKeys(fileName)
     debug = debug or false
     fields = fields or false
-    tmr.alarm(1,1000,1,function()
+    tmr.alarm(3,1000,1,function()
         if debug then
             print("connecting")
             print(node.heap())
         end
         if (wifi.sta.status()==5) then
-            tmr.stop(1)
+            tmr.stop(3)
+            print('here')
             -- timeout incase it can't connect for some reason
             tmr.alarm(1, 5*60*1000, 0, function()
                 node.restart()
