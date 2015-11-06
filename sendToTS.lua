@@ -1,18 +1,42 @@
 -- ***************************************************************************
 -- data.sparkfun posting module for ESP8266 with nodeMCU
 --
+-- I have found with nodemcu devkits I need to compile the file
+-- due to memory limitations
+--
 -- Written by Nate George
 --
 -- MIT license, http://opensource.org/licenses/MIT
+--
+-- Instructions:
+-- 1. Load keys using either the loadKeys or setKey function.
+-- 2. Get data ready to send using the setValue function.
+-- 3. Send data using the sendData function.
+-- 
+-- Example:
+-- sendToTS = require("sendToTS")
+-- sendToTS.setKey('YOUR_API_WRITE_KEY')
+-- valSet = sendToTS.setValue(1,12) -- channel, data.  sendToTS returns a boolean, true if set successfully
+-- sendToTS.sendData(true, 'callbackfile.lua') -- show debug msgs, callback file
+-- sendToTS = nil
+-- package.loaded["sendToTS"]=nil -- these last two lines help free up memory
+--
+-- the file 'callbackfile.lua' will be run after the data has been sent
 -- ***************************************************************************
 
 local moduleName = ...
 local M = {}
 _G[moduleName] = M
 
+local NUMBER_OF_FIELDS = 9
+local values = {}
 local address = "184.106.153.149" -- IP for api.thingspeak.com
+local readKey
+local writeKey
+local channelID
+local sk
 
-local function loadKeys(fileName)
+function M.loadKeys(fileName)
     if file.open(fileName) then
         local line = file.readline()
         channelID = string.sub(line,1,string.len(line)-1) -- hack to remove CR/LF
@@ -24,7 +48,37 @@ local function loadKeys(fileName)
     end
 end
 
-function M.sendData(fileName, dataToSend, fields, debug, callback)
+function M.setKey(privateKey)
+    writeKey = privateKey
+end
+
+function M.setAddr(addr)
+    -- for setting an IP address other than thingspeak
+    address = addr
+end
+
+function M.setValue(fieldId, fieldValue)
+    if(fieldId < 1 or fieldId > NUMBER_OF_FIELDS) then
+        return false;
+    end
+    values[fieldId] = fieldValue;
+    return true;
+end
+
+local function composeQuery()
+    local result = "/update?key=" .. writeKey
+    local ct
+    for ct=1, NUMBER_OF_FIELDS, 1 do
+        if values[ct] ~= nil then
+            local fieldParameter = "&field" .. tostring(ct) .. "=" .. tostring(values[ct]);
+            result = result .. fieldParameter;
+            values[ct] = nil;
+        end
+    end
+    return result;
+end
+
+function M.sendData(debug, callback)
     -- dataToSend is a table of data to send, 
     -- each entry is a table, with names of fields as first value in each entrytable
     -- the second value is the data
@@ -37,9 +91,8 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
     --
     -- callback is a file to run upon recieving a response from the server
     wifi.sta.connect()
-    loadKeys(fileName)
-    debug = debug or false
-    fields = fields or false
+    local debug = debug or false
+    local fields = fields or false
     tmr.alarm(3,1000,1,function()
         if debug then
             print("connecting")
@@ -52,70 +105,82 @@ function M.sendData(fileName, dataToSend, fields, debug, callback)
             tmr.alarm(1, 5*60*1000, 0, function()
                 node.restart()
             end)
+            print('here')
             if debug then
                 print("connected")
             end
             sk = net.createConnection(net.TCP, 0)
             sk:on("reconnection",function(conn) print("socket reconnected") end)
-            sk:on("disconnection",function(conn) print("socket disconnected") end)
+            sk:on("disconnection",function(conn) 
+                print("socket disconnected")
+                if callback~=nil then
+                    dofile(callback)
+                end
+                return false
+            end)
             sk:on("receive", function(conn, msg)
                 if debug then
                     print(msg)
                 end
-                local status
-                _, _, status = string.find(msg, "Status: (.+)\r\n")
-                print("status: "..status)
-                print(status=='200 OK') -- having a problem - next message is recieved before the code gets here
-                if (status=='200 OK') then
+                local status, status2, postStatus
+                _, _, status = string.find(msg, "Status: (200 OK)")
+                _, _, status2 = string.find(msg, "Status: (.+)\r\n")
+                _, _, postStatus = string.find(msg, "%d+\r\n%d+\r\n0")
+                print(postStatus)
+                if postStatus~=0 and postStatus~=nil then
+                    print('successfully updated')
+                end
+                print(status==status2)
+                --for i=1,string.len(status2), 1 do
+                --    print(string.sub(status2,i,i))
+                --end
+                if status=='200 OK' then
                     print('successful send')
+                    print('checked status: '..status)
                 else
                     print('unsuccessful send')
+                    print('checked status: '..status)
                 end
+                if status~=nil then
+                    print('successful send')
+                    local result = true
+                else
+                    print('no success')
+                    local result = false
+                end
+                print("found status: "..status)
+                print(status=='200 OK') -- having a problem - next message is recieved before the code gets here
                 collectgarbage()
                 tmr.stop(1)
                 if callback~=nil then
                     print('running callback file')
+                    collectgarbage()
                     dofile(callback)
                 end
+                return result
             end)
             sk:on("connection",function(conn)
                 if debug then
                     print("socket connected")
                     print("sending...")
                 end
-                local dataStr = ""
+                local sendStr
+                local query = composeQuery()
                 sendStr = "POST /update HTTP/1.1\r\n"
-                if fields then
-                    for num, arr in ipairs(dataToSend) do
-                        print(num, arr[1], arr[2], "field "..tostring(arr[3]))
-                        if (num>1) then
-                            dataStr = dataStr.."&"
-                        end
-                        dataStr = dataStr.."field"..tostring(arr[3]).."="..arr[2];
-                    end
-                else
-                    for num, arr in ipairs(dataToSend) do
-                        print(num, arr[1], arr[2])
-                        if (num>1) then
-                            dataStr = dataStr.."&"
-                        end
-                        dataStr = dataStr.."field"..tostring(num).."="..arr[2];
-                        print(node.heap())
-                    end
-                end
                 sendStr = sendStr.."Host: "..address.."\r\n"
                 sendStr = sendStr.."Connection: close\r\n"
                 sendStr = sendStr.."X-THINGSPEAKAPIKEY: "..writeKey.."\r\n"
                 sendStr = sendStr.."Content-Type: application/x-www-form-urlencoded\r\n"
-                sendStr = sendStr.."Content-Length: "..string.len(dataStr).."\r\n\r\n"
+                sendStr = sendStr.."Content-Length: "..string.len(query).."\r\n\r\n"
                 print(node.heap())
-                sendStr = sendStr..dataStr.."\r\n"
+                sendStr = sendStr..query.."\r\n"
                 print(node.heap())
                 conn:send(sendStr)
                 if debug then
                     conn:on("sent",function() print("sent!") end)
                 end
                 print(sendStr)
+                collectgarbage()
             end)
             sk:connect(80, address)
         end
