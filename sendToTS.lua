@@ -1,7 +1,7 @@
 -- ***************************************************************************
 -- data.sparkfun posting module for ESP8266 with nodeMCU
 --
--- I have found with nodemcu devkits I need to compile the file
+-- I have found with nodemcu devkits I sometimes need to compile the file
 -- due to memory limitations
 --
 -- Written by Nate George
@@ -90,6 +90,10 @@ function M.sendData(debug, callback)
     -- and make the third value in each dataToSend table the field number
     --
     -- callback is a file to run upon recieving a response from the server
+    if writeKey ==nil then
+        print("The API write key hasn't been set yet! Use sendToTS.setKey('yourAPIreadkey') to set it before reading data.")
+        return false
+    end
     wifi.sta.connect()
     local debug = debug or false
     local fields = fields or false
