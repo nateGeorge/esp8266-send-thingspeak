@@ -16,8 +16,13 @@ reading data is not so easy as of now.
 Example:
 
 ```
+fields = {}
+createdTimes = {}
 readTS = require("readTS")
-readTS.readData('JSF water level keys', true, 1, 'compareHeight.lua') -- args: filename containing writekey, readkey on two separate lines; show debug msg = true; number of results to return; callback file to run after completed request
+readTS.setChannelID("yourChID")
+readTS.setKey("your read API key")
+readTS.readData(true, 1, 'callbackFile.lua') -- args: filename containing writekey, readkey on two separate lines; show debug msg = true; number of results to return; callback file to run after completed request
 readTS = nil
 package.loaded["readTS"]=nil
+print(fields[1])
 ```
