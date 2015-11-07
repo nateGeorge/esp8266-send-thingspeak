@@ -1,8 +1,8 @@
 local moduleName = ...
 local M = {}
 _G[moduleName] = M
-fields = {}
-createdTimes = {}
+local readkey
+local channelID
 
 local address = "184.106.153.149" -- IP for api.thingspeak.com
 
@@ -18,7 +18,20 @@ local function loadKeys(fileName)
     end
 end
 
-function M.readData(fileName, debug, numResults, callback)
+function M.setKey(thaKey)
+    readKey = thaKey
+end
+
+function M.setChannelID(chID)
+    channelID = chID
+end
+
+function M.setAddr(addr)
+    -- for setting an IP address other than thingspeak
+    address = addr
+end
+
+function M.readData(debug, numResults, callback)
     -- dataToSend is a table of data to send, 
     -- each entry is a table, with names of fields as first value in each entrytable
     -- the second value is the data
@@ -29,7 +42,17 @@ function M.readData(fileName, debug, numResults, callback)
     if wifi.sta.status()~=5 and wifi.sta.status()~=1 then
         wifi.sta.connect()
     end
-    loadKeys(fileName)
+    if readKey == nil then
+        print("The read key hasn't been set yet! Use readTS.setKey('yourAPIreadkey') to set it before reading data.")
+        return false
+    end
+    if channelID == nil then
+        print("The channelID hasn't been set yet! Use readTS.setchannelID('yourAPIreadkey') to set it before reading data.")
+        return false
+    end
+    if fields == nil or createdTimes == nil then
+        print("You need to create the tables 'fields' and 'createdTimes' first before running.")
+    end
     debug = debug or false
     numResults = numResults or 100
     tmr.alarm(1, 1000, 1, function()
@@ -53,20 +76,22 @@ function M.readData(fileName, debug, numResults, callback)
             end
             end)
             sk:on("disconnection", function(conn) 
-            if debug then
-                print("socket disconnected")
-            end
+                if debug then
+                    print("socket disconnected")
+                end
+                if callback~=nil then
+                    dofile(callback)
+                end
             end)
             sk:on("receive", function(conn, msg)
                 if debug then
                     print(msg)
                 end
                 for i=1, 8, 1 do
-                    _, _, fields[i] = string.find(msg, "\"field"..tostring(i).."\":\"(%d%.?%d*)\"")
+                    _, _, fields[i] = string.find(msg, "\"field"..tostring(i).."\":\"(%d*%.?%d*)\"")
                 end
                 for i=1, numResults, 1 do
                     _, _, createdTimes[i] = string.find(msg, "\"created_at\":\"(%d*%-%d*%-%d*T%d*:%d*:%d*Z)\",\"entry_id\"")
-                    print('createdTimes'..createdTimes[i])
                 end
                 collectgarbage()
                 tmr.stop(1)
