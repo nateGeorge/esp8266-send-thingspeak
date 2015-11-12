@@ -16,8 +16,8 @@
 -- Example:
 -- sendToTS = require('sendToTS')
 -- sendToTS.setKey('YOUR_API_WRITE_KEY')
--- valSet = sendToTS.setValue(1,12) -- channel, data.  sendToTS returns a boolean, true if set successfully
--- sendToTS.sendData(true, 'callbackfile.lua') -- show debug msgs, callback file
+-- valSet = sendToTS.setValue(1,12) -- field number, data.  sendToTS returns a boolean, true if set successfully
+-- sendToTS.sendData(true, 'callbackfile.lua') -- show debug msgs T/F, callback file to run when done
 -- sendToTS = nil
 -- package.loaded["sendToTS"]=nil -- these last two lines help free up memory
 --
