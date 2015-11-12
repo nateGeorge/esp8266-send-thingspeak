@@ -14,7 +14,7 @@
 -- 3. Send data using the sendData function.
 -- 
 -- Example:
--- sendToTS = require("sendToTS")
+-- sendToTS = require('sendToTS')
 -- sendToTS.setKey('YOUR_API_WRITE_KEY')
 -- valSet = sendToTS.setValue(1,12) -- channel, data.  sendToTS returns a boolean, true if set successfully
 -- sendToTS.sendData(true, 'callbackfile.lua') -- show debug msgs, callback file
@@ -104,19 +104,19 @@ function M.sendData(debug, callback)
         end
         if (wifi.sta.status()==5) then
             tmr.stop(3)
-            print('here')
             -- timeout incase it can't connect for some reason
             tmr.alarm(1, 5*60*1000, 0, function()
                 node.restart()
             end)
-            print('here')
             if debug then
                 print("connected")
             end
             sk = net.createConnection(net.TCP, 0)
-            sk:on("reconnection",function(conn) print("socket reconnected") end)
+            sk:on("reconnection",function(conn) if debug then print("socket reconnected") end end)
             sk:on("disconnection",function(conn) 
-                print("socket disconnected")
+                if debug then
+                    print("socket disconnected, running callback")
+                end
                 if callback~=nil then
                     dofile(callback)
                 end
@@ -130,34 +130,40 @@ function M.sendData(debug, callback)
                 _, _, status = string.find(msg, "Status: (200 OK)")
                 _, _, status2 = string.find(msg, "Status: (.+)\r\n")
                 _, _, postStatus = string.find(msg, "%d+\r\n%d+\r\n0")
-                print(postStatus)
-                if postStatus~=0 and postStatus~=nil then
-                    print('successfully updated')
-                end
-                print(status==status2)
-                --for i=1,string.len(status2), 1 do
-                --    print(string.sub(status2,i,i))
-                --end
-                if status=='200 OK' then
-                    print('successful send')
-                    print('checked status: '..status)
-                else
-                    print('unsuccessful send')
-                    print('checked status: '..status)
+                if debug then
+                    print(postStatus)
+                    if postStatus~=0 and postStatus~=nil then
+                        print('successfully updated')
+                    end
+                    if status=='200 OK' then
+                        print('successful send')
+                        print('checked status: '..status)
+                    else
+                        print('unsuccessful send')
+                        print('checked status: '..status)
+                    end
                 end
                 if status~=nil then
-                    print('successful send')
+                    if debug then
+                        print('successful send')
+                    end
                     local result = true
                 else
-                    print('no success')
+                    if debug then
+                        print('no success')
+                    end
                     local result = false
                 end
-                print("found status: "..status)
-                print(status=='200 OK') -- having a problem - next message is recieved before the code gets here
+                if debug then
+                    print("found status: "..status)
+                    print(status=='200 OK') -- having a problem - next message is recieved before the code gets here
+                end
                 collectgarbage()
                 tmr.stop(1)
                 if callback~=nil then
-                    print('running callback file')
+                    if debug then
+                        print('running callback file')
+                    end
                     collectgarbage()
                     dofile(callback)
                 end
@@ -176,14 +182,14 @@ function M.sendData(debug, callback)
                 sendStr = sendStr.."X-THINGSPEAKAPIKEY: "..writeKey.."\r\n"
                 sendStr = sendStr.."Content-Type: application/x-www-form-urlencoded\r\n"
                 sendStr = sendStr.."Content-Length: "..string.len(query).."\r\n\r\n"
-                print(node.heap())
                 sendStr = sendStr..query.."\r\n"
-                print(node.heap())
                 conn:send(sendStr)
                 if debug then
-                    conn:on("sent",function() print("sent!") end)
+                    conn:on("sent",function() if debug then print("sent!") end end)
                 end
-                print(sendStr)
+                if debug then
+                    print(sendStr)
+                end
                 collectgarbage()
             end)
             sk:connect(80, address)
