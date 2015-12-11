@@ -1,5 +1,5 @@
 -- ***************************************************************************
--- data.sparkfun posting module for ESP8266 with nodeMCU
+-- thingspeak posting module for ESP8266 with nodeMCU
 --
 -- I have found with nodemcu devkits I sometimes need to compile the file
 -- due to memory limitations
