@@ -94,7 +94,9 @@ function M.sendData(debug, callback)
         print("The API write key hasn't been set yet! Use sendToTS.setKey('yourAPIreadkey') to set it before reading data.")
         return false
     end
-    wifi.sta.connect()
+    if wifi.sta.status()~=5 then
+        wifi.sta.connect()
+    end
     local debug = debug or false
     local fields = fields or false
     tmr.alarm(3,1000,1,function()
